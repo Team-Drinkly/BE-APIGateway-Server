@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.1.5'
+    id 'org.springframework.boot' version '3.1.9'  // 최신 3.1.x 버전 사용
     id 'io.spring.dependency-management' version '1.1.4'
 }
 
@@ -13,58 +13,44 @@ java {
     }
 }
 
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
-}
-
 repositories {
     mavenCentral()
 }
 
 ext {
-    set('springCloudVersion', "2023.0.1")  // 최신 Spring Cloud 버전 적용
+    set('springCloudVersion', "2022.0.4")  // Spring Cloud 버전 다운그레이드 (호환 문제 해결)
 }
 
 dependencies {
-    // Spring Cloud Gateway
+    // Gateway & Eureka 클라이언트
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
-
-    // Eureka Client 최신 버전
-    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.0.3'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.0.2'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // JWT (인증 & 보안)
-    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'  // 최신 버전 적용
+    // JWT (보안)
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
 
-    // Jackson - Java Time 지원
+    // Jackson (Java Time 지원)
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
-    // Spring Cloud Config (필요하면 사용)
-    implementation "org.springframework.cloud:spring-cloud-starter-config"
-    implementation "org.springframework.cloud:spring-cloud-starter-bootstrap"
+    // Spring Cloud Config (Config Server 사용 안 할 경우 주석 처리 가능)
+    // implementation "org.springframework.cloud:spring-cloud-starter-config"
 
     // Actuator (모니터링)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // WebFlux (Spring Cloud Gateway는 WebFlux 기반)
+    // WebFlux (Gateway는 WebFlux 기반)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
     // SpringDoc OpenAPI (Swagger)
-    implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.5.0'  // 최신 버전 적용
-    implementation 'org.springdoc:springdoc-openapi-starter-webflux-api:2.5.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.2.0'
 
-    // Springfox Swagger (⚠ Spring Boot 3.x 비호환, 제거 권장)
-    // implementation 'io.springfox:springfox-boot-starter:3.0.0'
-    // implementation 'io.springfox:springfox-swagger-ui:3.0.0'
-
-    // 테스트
+    // 테스트 관련 라이브러리
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
