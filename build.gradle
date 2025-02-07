@@ -25,6 +25,7 @@ dependencies {
     // Gateway & Eureka 클라이언트
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.0.3'
+    implementation 'org.springframework.cloud:spring-cloud-starter-bus-amqp'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
