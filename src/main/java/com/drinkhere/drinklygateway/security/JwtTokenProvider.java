@@ -1,40 +1,48 @@
 package com.drinkhere.drinklygateway.security;
 
-import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import jakarta.annotation.PostConstruct;
-import lombok.Getter;
-import lombok.Setter;
+import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
+
 @Component
-@ConfigurationProperties(prefix = "jwt")
-@Getter
-@Setter
 @Slf4j
 public class JwtTokenProvider {
 
-    private String secret;
+    private final SecretKey secretKey;
 
-    private JwtParser jwtParser;
-
-    @PostConstruct
-    public void init() {
-        this.jwtParser = Jwts.parser().setSigningKey(secret);
+    public JwtTokenProvider(@Value("${jwt.secret}") String secret) {
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    // JWT 검증 메서드 (Secret Key 사용)
     public void validateJwtToken(String token) {
         try {
-            jwtParser.parseClaimsJws(token);
+            log.info("🛠 Validating JWT Token: {}", token); // 토큰 로그 추가
+            Jwts.parserBuilder()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token);
+            log.info("JWT Token is valid!");
         } catch (Exception e) {
-            log.info("JWT 오류: {}", e.getMessage());
+            log.error("JWT 검증 중 오류 발생: {}", e.getMessage());
             throw e;
         }
     }
 
+    // JWT에서 user-id 추출
     public String getSocialId(String token) {
-        return jwtParser.parseClaimsJws(token).getBody().getSubject();
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        String userId = claims.get("user-id", String.class);
+        log.info("Extracted User ID: {}", userId);  // UserID 로그 추가
+        return userId;
     }
 }
