@@ -29,7 +29,8 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final List<String> EXCLUDED_PATHS = List.of("/member/login", "/member/register");
+    // 인증을 생략할 경로 리스트
+    private static final List<String> EXCLUDED_PATHS = List.of("/member/");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -38,7 +39,7 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
 
         log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
 
-        // Member 서비스로 가는 요청은 JWT 검증 건너뛰기
+        // "/member/**" 경로에 대해 JWT 인증을 생략
         if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
             log.info("Member 관련 API 요청. JWT 검증 생략.");
             return chain.filter(exchange);
@@ -73,7 +74,6 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
         }
     }
 
-
     private Mono<Void> continueWithGuestRole(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest newRequest = exchange.getRequest().mutate()
                 .header("user-id", "guest")
@@ -100,4 +100,3 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
         return response.writeWith(Mono.just(buffer));
     }
 }
-

@@ -22,12 +22,16 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Component
 @Slf4j
 public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<AuthorizationHeaderFilter.Config> {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final List<String> EXCLUDED_PATHS = List.of("/member/");
 
     public AuthorizationHeaderFilter(JwtTokenProvider jwtTokenProvider) {
         super(Config.class);
@@ -41,7 +45,14 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
-            log.info("AuthorizationHeaderFilter Start: {}", request.getURI());
+            String requestPath = request.getURI().getPath();
+            log.info("AuthorizationHeaderFilter Start: {}", requestPath);
+
+            // "/member/**" 경로는 인증을 생략
+            if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
+                log.info("Member 관련 API 요청. JWT 검증 생략.");
+                return chain.filter(exchange);
+            }
 
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
@@ -54,7 +65,7 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                 return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.UNAUTHORIZED);
             }
 
-            String token = authorizationHeader.substring(7).trim(); // "Bearer " 이후 부분
+            String token = authorizationHeader.substring(7).trim();
 
             try {
                 jwtTokenProvider.validateJwtToken(token);
@@ -103,4 +114,5 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             return response.setComplete();
         }
     }
+
 }
