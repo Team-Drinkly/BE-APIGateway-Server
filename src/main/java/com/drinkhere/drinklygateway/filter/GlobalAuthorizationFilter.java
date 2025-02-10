@@ -29,14 +29,22 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final List<String> EXCLUDED_PATHS = List.of("/member/login", "/member/register");
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        log.info("[GlobalAuthorizationFilter] 요청 URL: {}", request.getURI());
+        String requestPath = request.getURI().getPath();
+
+        log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
+
+        // Member 서비스로 가는 요청은 JWT 검증 건너뛰기
+        if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
+            log.info("Member 관련 API 요청. JWT 검증 생략.");
+            return chain.filter(exchange);
+        }
 
         HttpHeaders headers = request.getHeaders();
-
-        // Authorization 헤더 확인
         if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
             log.warn("Authorization 헤더 없음. 게스트로 요청 처리.");
             return continueWithGuestRole(exchange, chain);
@@ -51,22 +59,20 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
         log.info("JWT 토큰 확인: {}", token);
 
         try {
-            // 토큰 검증
             jwtTokenProvider.validateJwtToken(token);
             String userId = jwtTokenProvider.getSocialId(token);
 
-            // 요청에 user-id 추가
             ServerHttpRequest newRequest = request.mutate()
                     .header("user-id", userId)
                     .build();
 
             return chain.filter(exchange.mutate().request(newRequest).build());
-
         } catch (Exception e) {
             log.error("JWT 인증 실패: {}", e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_JWT_TOKEN);
         }
     }
+
 
     private Mono<Void> continueWithGuestRole(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest newRequest = exchange.getRequest().mutate()
