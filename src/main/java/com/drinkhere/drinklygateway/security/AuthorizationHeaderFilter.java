@@ -48,12 +48,6 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             String requestPath = request.getURI().getPath();
             log.info("AuthorizationHeaderFilter Start: {}", requestPath);
 
-            // "/member/**" 경로는 인증을 생략
-            if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
-                log.info("Member 관련 API 요청. JWT 검증 생략.");
-                return chain.filter(exchange);
-            }
-
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
                 log.warn("Authorization header is missing. Assigning guest user.");
@@ -65,14 +59,16 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                 return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.UNAUTHORIZED);
             }
 
+            // JWT 토큰 파싱
             String token = authorizationHeader.substring(7).trim();
-
             try {
                 jwtTokenProvider.validateJwtToken(token);
-                String userId = jwtTokenProvider.getSocialId(token);
+                String userId = jwtTokenProvider.getSocialId(token);  // JWT에서 user-id 추출
 
+                // 새 요청 생성 (기존 Authorization 제거, user-id 추가)
                 ServerHttpRequest newRequest = request.mutate()
-                        .header("user-id", userId)
+                        .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION)) // 기존 Authorization 제거
+                        .header("user-id", userId) // user-id 추가
                         .build();
 
                 log.info("Authorized user: {}", userId);

@@ -39,6 +39,12 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
 
         log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
 
+        // 이미 user-id 헤더가 있다면 중복 검증하지 않음!
+        if (request.getHeaders().containsKey("user-id")) {
+            log.info("user-id 헤더가 존재하므로 JWT 재검증 생략.");
+            return chain.filter(exchange);
+        }
+
         // "/member/**" 경로에 대해 JWT 인증을 생략
         if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
             log.info("Member 관련 API 요청. JWT 검증 생략.");
@@ -64,10 +70,13 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
             String userId = jwtTokenProvider.getSocialId(token);
 
             ServerHttpRequest newRequest = request.mutate()
+                    .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                     .header("user-id", userId)
                     .build();
 
+            log.info("Global 필터에서 user-id 추가: {}", userId);
             return chain.filter(exchange.mutate().request(newRequest).build());
+
         } catch (Exception e) {
             log.error("JWT 인증 실패: {}", e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_JWT_TOKEN);

@@ -2,6 +2,7 @@ package com.drinkhere.drinklygateway.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,13 +17,14 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
 
     public JwtTokenProvider(@Value("${jwt.secret}") String secret) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes());
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     // JWT 검증 메서드 (Secret Key 사용)
     public void validateJwtToken(String token) {
         try {
-            log.info("🛠 Validating JWT Token: {}", token); // 토큰 로그 추가
+            log.info("Validating JWT Token: {}", token); // 토큰 로그 추가
             Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
