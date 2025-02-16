@@ -31,6 +31,7 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // `/member/**` 경로는 JWT 검증 제외
     private static final List<String> EXCLUDED_PATHS = List.of("/member/");
 
     public AuthorizationHeaderFilter(JwtTokenProvider jwtTokenProvider) {
@@ -47,6 +48,12 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             ServerHttpRequest request = exchange.getRequest();
             String requestPath = request.getURI().getPath();
             log.info("AuthorizationHeaderFilter Start: {}", requestPath);
+
+            // "/member/**" 경로는 JWT 검증 생략
+            if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
+                log.info("Member 관련 API 요청. JWT 검증 생략.");
+                return chain.filter(exchange);
+            }
 
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
