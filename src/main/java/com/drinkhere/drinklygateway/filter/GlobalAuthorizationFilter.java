@@ -4,11 +4,11 @@ import com.drinkhere.drinklygateway.response.ErrorCode;
 import com.drinkhere.drinklygateway.response.ErrorResponse;
 import com.drinkhere.drinklygateway.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.ExpiredJwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,6 +20,8 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @Slf4j
@@ -29,67 +31,108 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 인증을 생략할 경로 리스트
-    private static final List<String> EXCLUDED_PATHS = List.of("/member/");
+    // 인증 제외 경로
+    private static final List<Pattern> EXCLUDED_PATHS = List.of(
+            Pattern.compile("^/api/v1/member/.*$"),
+            Pattern.compile("^/api/v1/.*/actuators/.*$")
+    );
+
+    // `api/v1/{service}/{role}/**` 패턴을 위한 정규식
+    private static final Pattern PATH_PATTERN = Pattern.compile("^/api/v1/([^/]+)/([mo])/.*$");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String requestPath = request.getURI().getPath();
-
         log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
 
-        // 이미 user-id 헤더가 있다면 중복 검증하지 않음!
-        if (request.getHeaders().containsKey("user-id")) {
-            log.info("user-id 헤더가 존재하므로 JWT 재검증 생략.");
-            return chain.filter(exchange);
-        }
-
-        // "/member/**" 경로에 대해 JWT 인증을 생략
-        if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
-            log.info("Member 관련 API 요청. JWT 검증 생략.");
+        // 인증 제외 경로 확인
+        if (EXCLUDED_PATHS.stream().anyMatch(pattern -> pattern.matcher(requestPath).matches())) {
+            log.info("인증 제외 경로 접근: {}", requestPath);
             return chain.filter(exchange);
         }
 
         HttpHeaders headers = request.getHeaders();
         if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
-            log.warn("Authorization 헤더 없음. 게스트로 요청 처리.");
-            return continueWithGuestRole(exchange, chain);
-        }
-
-        List<String> authHeaders = headers.get(HttpHeaders.AUTHORIZATION);
-        if (authHeaders == null || authHeaders.isEmpty()) {
+            log.warn("Authorization 헤더 없음.");
             return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.NOT_FOUND_JWT_TOKEN);
         }
 
-        String token = authHeaders.get(0).replace("Bearer ", "").trim();
+        String token = headers.getFirst(HttpHeaders.AUTHORIZATION);
+        if (token == null || !token.startsWith("Bearer ")) {
+            return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.NOT_FOUND_JWT_TOKEN);
+        }
+
+        token = token.substring(7).trim();
         log.info("JWT 토큰 확인: {}", token);
 
         try {
             jwtTokenProvider.validateJwtToken(token);
-            String userId = jwtTokenProvider.getSocialId(token);
+            Matcher matcher = PATH_PATTERN.matcher(requestPath);
 
-            ServerHttpRequest newRequest = request.mutate()
-                    .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
-                    .header("user-id", userId)
-                    .build();
+            if (matcher.matches()) {
+                String service = matcher.group(1); // 서비스명 (ex: coupon, store)
+                String role = matcher.group(2);    // m (멤버) or o (사장님)
 
-            log.info("Global 필터에서 user-id 추가: {}", userId);
-            return chain.filter(exchange.mutate().request(newRequest).build());
+                if ("m".equals(role)) {
+                    return validateMemberToken(exchange, chain, request, token);
+                } else if ("o".equals(role)) {
+                    return validateOwnerToken(exchange, chain, request, token);
+                }
+            }
 
+            return onError(exchange, HttpStatus.FORBIDDEN, ErrorCode.UNAUTHORIZED);
+
+        } catch (ExpiredJwtException e) {
+            log.error("JWT 만료됨: {}", e.getMessage());
+            return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.EXPIRED_JWT);
         } catch (Exception e) {
             log.error("JWT 인증 실패: {}", e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_JWT_TOKEN);
         }
     }
 
-    private Mono<Void> continueWithGuestRole(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest newRequest = exchange.getRequest().mutate()
-                .header("user-id", "guest")
+    /**
+     * `/api/v1/{service}/m/**` 요청에 대한 멤버 검증
+     */
+    private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
+        String memberId = jwtTokenProvider.getMemberId(token);
+        boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
+        String subscribeId = jwtTokenProvider.getSubscribeId(token);
+
+        if (!isSubscribed) {
+            log.warn("구독되지 않은 멤버: {}, subscribeId={}", memberId, subscribeId);
+            return onError(exchange, HttpStatus.FORBIDDEN, ErrorCode.UNAUTHORIZED);
+        }
+
+        ServerHttpRequest newRequest = request.mutate()
+                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
+                .header("member-id", memberId)
+                .header("subscribe-id", subscribeId)
                 .build();
+
+        log.info("멤버 인증 성공: {}, subscribeId={}", memberId, subscribeId);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
+    /**
+     * `/api/v1/{service}/o/**` 요청에 대한 사장님 검증
+     */
+    private Mono<Void> validateOwnerToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
+        String ownerId = jwtTokenProvider.getOwnerId(token);
+
+        ServerHttpRequest newRequest = request.mutate()
+                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
+                .header("owner-id", ownerId)
+                .build();
+
+        log.info("사장님 인증 성공: {}", ownerId);
+        return chain.filter(exchange.mutate().request(newRequest).build());
+    }
+
+    /**
+     * 인증 실패 시 JSON 응답 반환
+     */
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus status, ErrorCode errorCode) {
         log.error("JWT 인증 실패 - 상태 코드: {}, 에러 코드: {}", status, errorCode);
 
@@ -105,7 +148,6 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
             responseBody = "{\"message\": \"JSON 변환 오류\"}".getBytes(StandardCharsets.UTF_8);
         }
 
-        DataBuffer buffer = response.bufferFactory().wrap(responseBody);
-        return response.writeWith(Mono.just(buffer));
+        return response.writeWith(Mono.just(response.bufferFactory().wrap(responseBody)));
     }
 }
