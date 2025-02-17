@@ -33,8 +33,10 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper;
 
-    // 인증이 필요 없는 경로 리스트 (회원가입, 로그인 등)
-    private static final List<String> EXCLUDED_PATHS = List.of("/api/v1/member/login", "/api/v1/member/signup");
+    // 인증이 필요 없는 경로 리스트
+    private static final List<Pattern> EXCLUDED_PATHS = List.of(
+            Pattern.compile("^/api/v1/member/.*$")
+    );
 
     // 경로 패턴 `/api/v1/{service}/{role}/**`
     private static final Pattern PATH_PATTERN = Pattern.compile("^/api/v1/([^/]+)/([mo])/.*$");
@@ -56,8 +58,8 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             log.info("AuthorizationHeaderFilter Start: {}", requestPath);
 
             // 특정 경로에서는 인증을 생략
-            if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
-                log.info("인증 제외 경로. JWT 검증 생략.");
+            if (EXCLUDED_PATHS.stream().anyMatch(pattern -> pattern.matcher(requestPath).matches())) {
+                log.info("인증 제외 경로 접근: {}", requestPath);
                 return chain.filter(exchange);
             }
 

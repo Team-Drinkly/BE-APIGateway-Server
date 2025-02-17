@@ -30,8 +30,10 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 인증 제외 경로 (ex: 회원가입, 로그인)
-    private static final List<String> EXCLUDED_PATHS = List.of("/api/v1/member/login", "/api/v1/member/signup");
+    // 인증 제외 경로
+    private static final List<Pattern> EXCLUDED_PATHS = List.of(
+            Pattern.compile("^/api/v1/member/.*$")
+    );
 
     // `api/v1/{service}/{role}/**` 패턴을 위한 정규식
     private static final Pattern PATH_PATTERN = Pattern.compile("^/api/v1/([^/]+)/([mo])/.*$");
@@ -44,8 +46,8 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
         log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
 
         // JWT 검증을 생략할 경로 확인
-        if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
-            log.info("인증 제외 경로 접근. JWT 검증 생략.");
+        if (EXCLUDED_PATHS.stream().anyMatch(pattern -> pattern.matcher(requestPath).matches())) {
+            log.info("인증 제외 경로 접근: {}", requestPath);
             return chain.filter(exchange);
         }
 
