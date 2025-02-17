@@ -23,20 +23,26 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @Slf4j
 public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<AuthorizationHeaderFilter.Config> {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    // `/member/**` 경로는 JWT 검증 제외
-    private static final List<String> EXCLUDED_PATHS = List.of("/member/");
+    // 인증이 필요 없는 경로 리스트 (회원가입, 로그인 등)
+    private static final List<String> EXCLUDED_PATHS = List.of("/api/v1/member/login", "/api/v1/member/signup");
 
-    public AuthorizationHeaderFilter(JwtTokenProvider jwtTokenProvider) {
+    // 경로 패턴 `/api/v1/{service}/{role}/**`
+    private static final Pattern PATH_PATTERN = Pattern.compile("^/api/v1/([^/]+)/([mo])/.*$");
+
+    public AuthorizationHeaderFilter(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
         super(Config.class);
         this.jwtTokenProvider = jwtTokenProvider;
+        this.objectMapper = objectMapper;
     }
 
     public static class Config {
@@ -49,15 +55,15 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             String requestPath = request.getURI().getPath();
             log.info("AuthorizationHeaderFilter Start: {}", requestPath);
 
-            // "/member/**" 경로는 JWT 검증 생략
+            // 특정 경로에서는 인증을 생략
             if (EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith)) {
-                log.info("Member 관련 API 요청. JWT 검증 생략.");
+                log.info("인증 제외 경로. JWT 검증 생략.");
                 return chain.filter(exchange);
             }
 
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
-                log.warn("Authorization header is missing. Assigning guest user.");
+                log.warn("Authorization 헤더 없음. 게스트 사용자로 처리.");
                 return assignGuestRole(exchange, chain);
             }
 
@@ -66,20 +72,23 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                 return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.UNAUTHORIZED);
             }
 
-            // JWT 토큰 파싱
             String token = authorizationHeader.substring(7).trim();
             try {
                 jwtTokenProvider.validateJwtToken(token);
-                String userId = jwtTokenProvider.getSocialId(token);  // JWT에서 user-id 추출
+                Matcher matcher = PATH_PATTERN.matcher(requestPath);
 
-                // 새 요청 생성 (기존 Authorization 제거, user-id 추가)
-                ServerHttpRequest newRequest = request.mutate()
-                        .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION)) // 기존 Authorization 제거
-                        .header("user-id", userId) // user-id 추가
-                        .build();
+                if (matcher.matches()) {
+                    String service = matcher.group(1); // 서비스명 (예: coupon, store)
+                    String role = matcher.group(2);    // m (멤버) or o (사장님)
 
-                log.info("Authorized user: {}", userId);
-                return chain.filter(exchange.mutate().request(newRequest).build());
+                    if ("m".equals(role)) {
+                        return validateMemberToken(exchange, chain, request, token);
+                    } else if ("o".equals(role)) {
+                        return validateOwnerToken(exchange, chain, request, token);
+                    }
+                }
+
+                return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.FORBIDDEN);
 
             } catch (ExpiredJwtException e) {
                 return onError(exchange, ErrorCode.EXPIRED_JWT, HttpStatus.UNAUTHORIZED);
@@ -92,6 +101,45 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
         };
     }
 
+    /**
+     * `/api/v1/{service}/m/**` 요청에 대한 멤버 검증
+     */
+    private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
+        String memberId = jwtTokenProvider.getMemberId(token);
+        boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
+
+        if (!isSubscribed) {
+            log.warn("구독되지 않은 멤버: {}", memberId);
+            return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.FORBIDDEN);
+        }
+
+        ServerHttpRequest newRequest = request.mutate()
+                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
+                .header("member-id", memberId)
+                .build();
+
+        log.info("멤버 인증 성공: {}", memberId);
+        return chain.filter(exchange.mutate().request(newRequest).build());
+    }
+
+    /**
+     * `/api/v1/{service}/o/**` 요청에 대한 사장님 검증
+     */
+    private Mono<Void> validateOwnerToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
+        String ownerId = jwtTokenProvider.getOwnerId(token);
+
+        ServerHttpRequest newRequest = request.mutate()
+                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
+                .header("owner-id", ownerId)
+                .build();
+
+        log.info("사장님 인증 성공: {}", ownerId);
+        return chain.filter(exchange.mutate().request(newRequest).build());
+    }
+
+    /**
+     * Authorization 헤더가 없을 경우 "guest"로 처리
+     */
     private Mono<Void> assignGuestRole(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest newRequest = exchange.getRequest().mutate()
                 .header("user-id", "guest")
@@ -99,6 +147,9 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
+    /**
+     * JWT 인증 실패 시 JSON 응답 반환
+     */
     private Mono<Void> onError(ServerWebExchange exchange, ErrorCode errorCode, HttpStatus status) {
         log.warn("Authorization error: {} - {}", status, errorCode);
 
@@ -117,5 +168,4 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             return response.setComplete();
         }
     }
-
 }

@@ -21,10 +21,10 @@ public class JwtTokenProvider {
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // JWT 검증 메서드 (Secret Key 사용)
+    // JWT 검증 메서드
     public void validateJwtToken(String token) {
         try {
-            log.info("Validating JWT Token: {}", token); // 토큰 로그 추가
+            log.info("Validating JWT Token: {}", token);
             Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
@@ -36,15 +36,27 @@ public class JwtTokenProvider {
         }
     }
 
-    // JWT에서 user-id 추출
-    public String getSocialId(String token) {
-        Claims claims = Jwts.parserBuilder()
+    // JWT에서 memberId 추출
+    public String getMemberId(String token) {
+        return getClaims(token).get("member-id", String.class);
+    }
+
+    // JWT에서 구독 여부 추출
+    public boolean isSubscribed(String token) {
+        return getClaims(token).get("isSubscribed", Boolean.class);
+    }
+
+    // JWT에서 ownerId 추출
+    public String getOwnerId(String token) {
+        return getClaims(token).get("owner-id", String.class);
+    }
+
+    // JWT Claims 추출
+    private Claims getClaims(String token) {
+        return Jwts.parserBuilder()
                 .setSigningKey(secretKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-        String userId = claims.get("user-id", String.class);
-        log.info("Extracted User ID: {}", userId);  // UserID 로그 추가
-        return userId;
     }
 }
