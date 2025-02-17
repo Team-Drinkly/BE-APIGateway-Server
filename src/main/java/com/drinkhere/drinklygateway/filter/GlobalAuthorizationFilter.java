@@ -33,7 +33,8 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
 
     // 인증 제외 경로
     private static final List<Pattern> EXCLUDED_PATHS = List.of(
-            Pattern.compile("^/api/v1/member/.*$")
+            Pattern.compile("^/api/v1/member/.*$"),
+            Pattern.compile("^/api/v1/.*/actuators/.*$")
     );
 
     // `api/v1/{service}/{role}/**` 패턴을 위한 정규식

@@ -35,7 +35,8 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
 
     // 인증이 필요 없는 경로 리스트
     private static final List<Pattern> EXCLUDED_PATHS = List.of(
-            Pattern.compile("^/api/v1/member/.*$")
+            Pattern.compile("^/api/v1/member/.*$"),
+            Pattern.compile("^/api/v1/.*/actuators/.*$")
     );
 
     // 경로 패턴 `/api/v1/{service}/{role}/**`
