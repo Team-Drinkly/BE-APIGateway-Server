@@ -109,18 +109,20 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
     private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
         String memberId = jwtTokenProvider.getMemberId(token);
         boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
+        String subscribeId = jwtTokenProvider.getSubscribeId(token);
 
         if (!isSubscribed) {
-            log.warn("구독되지 않은 멤버: {}", memberId);
+            log.warn("구독되지 않은 멤버: {}, subscribeId={}", memberId, subscribeId);
             return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.FORBIDDEN);
         }
 
         ServerHttpRequest newRequest = request.mutate()
                 .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                 .header("member-id", memberId)
+                .header("subscribe-id", subscribeId)  // 구독 ID 헤더 추가
                 .build();
 
-        log.info("멤버 인증 성공: {}", memberId);
+        log.info("멤버 인증 성공: {}, subscribeId={}", memberId, subscribeId);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 

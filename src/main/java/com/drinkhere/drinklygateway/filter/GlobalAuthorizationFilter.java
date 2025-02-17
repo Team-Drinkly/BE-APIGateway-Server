@@ -4,6 +4,7 @@ import com.drinkhere.drinklygateway.response.ErrorCode;
 import com.drinkhere.drinklygateway.response.ErrorResponse;
 import com.drinkhere.drinklygateway.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.ExpiredJwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -42,10 +43,9 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String requestPath = request.getURI().getPath();
-
         log.info("[GlobalAuthorizationFilter] 요청 URL: {}", requestPath);
 
-        // JWT 검증을 생략할 경로 확인
+        // 인증 제외 경로 확인
         if (EXCLUDED_PATHS.stream().anyMatch(pattern -> pattern.matcher(requestPath).matches())) {
             log.info("인증 제외 경로 접근: {}", requestPath);
             return chain.filter(exchange);
@@ -82,6 +82,9 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
 
             return onError(exchange, HttpStatus.FORBIDDEN, ErrorCode.UNAUTHORIZED);
 
+        } catch (ExpiredJwtException e) {
+            log.error("JWT 만료됨: {}", e.getMessage());
+            return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.EXPIRED_JWT);
         } catch (Exception e) {
             log.error("JWT 인증 실패: {}", e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_JWT_TOKEN);
@@ -94,18 +97,20 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
         String memberId = jwtTokenProvider.getMemberId(token);
         boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
+        String subscribeId = jwtTokenProvider.getSubscribeId(token);
 
         if (!isSubscribed) {
-            log.warn("구독되지 않은 멤버: {}", memberId);
+            log.warn("구독되지 않은 멤버: {}, subscribeId={}", memberId, subscribeId);
             return onError(exchange, HttpStatus.FORBIDDEN, ErrorCode.UNAUTHORIZED);
         }
 
         ServerHttpRequest newRequest = request.mutate()
                 .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                 .header("member-id", memberId)
+                .header("subscribe-id", subscribeId)
                 .build();
 
-        log.info("멤버 인증 성공: {}", memberId);
+        log.info("멤버 인증 성공: {}, subscribeId={}", memberId, subscribeId);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
@@ -124,6 +129,9 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
+    /**
+     * 인증 실패 시 JSON 응답 반환
+     */
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus status, ErrorCode errorCode) {
         log.error("JWT 인증 실패 - 상태 코드: {}, 에러 코드: {}", status, errorCode);
 
