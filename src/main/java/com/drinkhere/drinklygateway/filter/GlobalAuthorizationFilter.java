@@ -28,8 +28,10 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final List<Pattern> EXCLUDED_PATHS = List.of(
-            Pattern.compile("^/api/v1/member/.*$"),
-            Pattern.compile("^/api/v1/.*/actuators/.*$")
+            Pattern.compile("^/api/v1/member/.*"),           // 멤버 관련 API 인증 제외
+            Pattern.compile("^/api/v1/.*/actuators/.*$"),     // Actuator API 인증 제외
+            Pattern.compile("^/api/v1/.*/swagger-ui/.*$"),   // 모든 서비스의 Swagger UI 인증 제외
+            Pattern.compile("^/api/v1/.*/api-docs/.*$")      // 모든 서비스의 API Docs 인증 제외
     );
 
     @Override
