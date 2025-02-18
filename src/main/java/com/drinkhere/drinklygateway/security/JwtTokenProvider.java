@@ -67,8 +67,8 @@ public class JwtTokenProvider {
     /**
      * JWT에서 subscribeId 추출
      */
-    public String getSubscribeId(String token) {
-        return getClaims(token).get("subscribe-id", String.class);
+    public Long getSubscribeId(String token) {
+        return getClaims(token).get("subscribe-id", Long.class);
     }
 
     /**

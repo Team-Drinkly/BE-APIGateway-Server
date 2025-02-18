@@ -96,22 +96,19 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
      * `/api/v1/{service}/m/**` 요청에 대한 멤버 검증
      */
     private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
+
         String memberId = jwtTokenProvider.getMemberId(token);
         boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
-        String subscribeId = jwtTokenProvider.getSubscribeId(token);
-
-        if (!isSubscribed) {
-            log.warn("구독되지 않은 멤버: {}, subscribeId={}", memberId, subscribeId);
-            return onError(exchange, HttpStatus.FORBIDDEN, ErrorCode.UNAUTHORIZED);
-        }
+        Long subscribeId = jwtTokenProvider.getSubscribeId(token);
 
         ServerHttpRequest newRequest = request.mutate()
                 .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                 .header("member-id", memberId)
-                .header("subscribe-id", subscribeId)
+                .header("subscribe-id", String.valueOf(subscribeId))
+                .header("is-subscribed", String.valueOf(isSubscribed))
                 .build();
 
-        log.info("멤버 인증 성공: {}, subscribeId={}", memberId, subscribeId);
+        log.info("멤버 인증 성공: {}, suscribe-id={}, is-subscribed={}", memberId, subscribeId, isSubscribed);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
