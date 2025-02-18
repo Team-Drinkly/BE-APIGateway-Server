@@ -66,8 +66,8 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
 
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
-                log.warn("Authorization 헤더 없음. 게스트 사용자로 처리.");
-                return assignGuestRole(exchange, chain);
+                log.warn("Authorization 헤더 없음.");
+                return onError(exchange, ErrorCode.NOT_FOUND_JWT_TOKEN, HttpStatus.UNAUTHORIZED);
             }
 
             String authorizationHeader = headers.getFirst(HttpHeaders.AUTHORIZATION);
@@ -81,8 +81,7 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                 Matcher matcher = PATH_PATTERN.matcher(requestPath);
 
                 if (matcher.matches()) {
-                    String service = matcher.group(1); // 서비스명 (예: coupon, store)
-                    String role = matcher.group(2);    // m (멤버) or o (사장님)
+                    String role = matcher.group(2);
 
                     if ("m".equals(role)) {
                         return validateMemberToken(exchange, chain, request, token);
@@ -90,68 +89,42 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                         return validateOwnerToken(exchange, chain, request, token);
                     }
                 }
-
                 return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.FORBIDDEN);
 
             } catch (ExpiredJwtException e) {
                 return onError(exchange, ErrorCode.EXPIRED_JWT, HttpStatus.UNAUTHORIZED);
             } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
                 return onError(exchange, ErrorCode.INVALID_JWT_TOKEN, HttpStatus.UNAUTHORIZED);
-            } catch (Exception e) {
-                log.error("JWT 검증 중 예기치 않은 오류 발생", e);
-                return onError(exchange, ErrorCode.INTERNAL_SERVER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         };
     }
 
-    /**
-     * `/api/v1/{service}/m/**` 요청에 대한 멤버 검증
-     */
     private Mono<Void> validateMemberToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
-
         String memberId = jwtTokenProvider.getMemberId(token);
         boolean isSubscribed = jwtTokenProvider.isSubscribed(token);
         Long subscribeId = jwtTokenProvider.getSubscribeId(token);
 
         ServerHttpRequest newRequest = request.mutate()
-                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                 .header("member-id", memberId)
                 .header("subscribe-id", String.valueOf(subscribeId))
                 .header("is-subscribed", String.valueOf(isSubscribed))
                 .build();
 
-        log.info("멤버 인증 성공: {}, suscribe-id={}, is-subscribed={}", memberId, subscribeId, isSubscribed);
+        log.info("멤버 인증 성공: member-id={}, subscribe-id={}, is-subscribed={}", memberId, subscribeId, isSubscribed);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
-    /**
-     * `/api/v1/{service}/o/**` 요청에 대한 사장님 검증
-     */
     private Mono<Void> validateOwnerToken(ServerWebExchange exchange, GatewayFilterChain chain, ServerHttpRequest request, String token) {
         String ownerId = jwtTokenProvider.getOwnerId(token);
 
         ServerHttpRequest newRequest = request.mutate()
-                .headers(httpHeaders -> httpHeaders.remove(HttpHeaders.AUTHORIZATION))
                 .header("owner-id", ownerId)
                 .build();
 
-        log.info("사장님 인증 성공: {}", ownerId);
+        log.info("사장님 인증 성공: owner-id={}", ownerId);
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
-    /**
-     * Authorization 헤더가 없을 경우 "guest"로 처리
-     */
-    private Mono<Void> assignGuestRole(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest newRequest = exchange.getRequest().mutate()
-                .header("user-id", "guest")
-                .build();
-        return chain.filter(exchange.mutate().request(newRequest).build());
-    }
-
-    /**
-     * JWT 인증 실패 시 JSON 응답 반환
-     */
     private Mono<Void> onError(ServerWebExchange exchange, ErrorCode errorCode, HttpStatus status) {
         log.warn("Authorization error: {} - {}", status, errorCode);
 
