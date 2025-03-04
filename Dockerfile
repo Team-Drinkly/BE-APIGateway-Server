@@ -1,3 +1,4 @@
 FROM openjdk:21
-COPY ./build/libs/ApiGateway.jar ApiGateway.jar
-ENTRYPOINT ["java", "-jar", "ApiGateway.jar"]
+COPY ./build/libs/gateway.jar gateway.jar
+#ENTRYPOINT ["java", "-Dspring.profiles.active=dev", "-jar", "gateway.jar"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=prod", "-jar", "gateway.jar"]

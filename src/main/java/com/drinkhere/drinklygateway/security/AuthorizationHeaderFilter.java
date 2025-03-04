@@ -35,10 +35,16 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
 
     // 인증이 필요 없는 경로 리스트
     private static final List<Pattern> EXCLUDED_PATHS = List.of(
-            Pattern.compile("^/api/v1/member/.*"),           // 멤버 관련 API 인증 제외
-            Pattern.compile("^/api/v1/.*/actuators/.*$"),     // Actuator API 인증 제외
-            Pattern.compile("^/api/v1/.*/swagger-ui/.*$"),   // 모든 서비스의 Swagger UI 인증 제외
-            Pattern.compile("^/api/v1/.*/api-docs/.*$")      // 모든 서비스의 API Docs 인증 제외
+            Pattern.compile("^/api/v1/config/.*"), // Config 서버 API 인증 제외
+            Pattern.compile("^/api/v1/member/.*"), // 멤버 관련 API 인증 제외
+            Pattern.compile("^/api/v1/.*/actuators/.*$"), // Actuator API 인증 제외
+            Pattern.compile("^/api/v1/.*/swagger-ui/.*$"), // 모든 서비스의 Swagger UI 인증 제외
+            Pattern.compile("^/api/v1/.*/api-docs$"),
+            Pattern.compile("^/api/v1/.*/api-docs/.*$"),
+            Pattern.compile("^/api/v1/store/o$"),
+            Pattern.compile("^/api/v1/store/m/list$"),
+            Pattern.compile("^/api/v1/store/m/list/\\d+$"), // /api/v1/store/m/{storeId} 경로 (숫자만) 제외
+            Pattern.compile("^/api/v1/store/m/free-drink/client/.*$")
     );
 
     // 경로 패턴 `/api/v1/{service}/{role}/**`

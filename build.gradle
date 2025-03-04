@@ -24,7 +24,7 @@ ext {
 dependencies {
     // Gateway & Eureka 클라이언트
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
-    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.0.3'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.cloud:spring-cloud-starter-bus-amqp'
 
     // Lombok
@@ -41,7 +41,6 @@ dependencies {
 
     // Spring Cloud Config (Config Server 사용 안 할 경우 주석 처리 가능)
     implementation 'org.springframework.cloud:spring-cloud-starter-config'
-    implementation "org.springframework.cloud:spring-cloud-starter-bootstrap"
 
     // Actuator (모니터링)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -64,7 +63,7 @@ tasks.named('test') {
 }
 
 bootJar {
-    archivesBaseName = 'ApiGateway'
-    archiveFileName = 'ApiGateway.jar'
+    archivesBaseName = 'gateway'
+    archiveFileName = 'gateway.jar'
     archiveVersion = "0.0.1"
 }

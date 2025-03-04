@@ -1,0 +1,60 @@
+server:
+  port: 8000
+
+# 유레카 서버 등록
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true   # Eureka 에 등록
+    fetch-registry: true         # 다른 서비스 목록 가져오기
+
+spring:
+  application:
+    name: gateway
+
+  config:
+    import: optional:configserver:http://config-server:8888
+
+  cloud:
+    gateway:
+      routes:
+        - id: config-server # 헬스 체크용
+          uri: lb://CONFIG-SERVER
+          predicates:
+            - Path=/api/v1/config/**
+
+        - id: member-service # Routing to Member Micro Service
+          uri: lb://MEMBER-SERVICE
+          predicates:
+            - Path=/api/v1/member/**
+
+
+
+      discovery:
+        locator:
+          enabled: true
+#        - id: store-service
+#          uri: lb://STORE-SERVICE
+#          predicates:
+#            - Path=/store/**
+#          filters:
+#            - AuthorizationHeaderFilter
+#
+#        - id: payment-service
+#          uri: lb://PAYMENT-SERVICE
+#          predicates:
+#            - Path=/payment/**
+#          filters:
+#            - AuthorizationHeaderFilter
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: refresh, busrefresh
+  endpoint:
+    health:
+      show-details: always
+    bus-refresh:
+      enabled: true
