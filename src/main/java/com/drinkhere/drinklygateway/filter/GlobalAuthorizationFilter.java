@@ -37,7 +37,9 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
             Pattern.compile("^/api/v1/store/o$"),
             Pattern.compile("^/api/v1/store/m/list$"),
             Pattern.compile("^/api/v1/store/m/list/\\d+$"), // /api/v1/store/m/{storeId} 경로 (숫자만) 제외
-            Pattern.compile("^/api/v1/store/m/free-drink/client/.*$")
+            Pattern.compile("^/api/v1/store/m/free-drink/client/.*$"),
+            Pattern.compile("^/api/v1/payment/m/coupons/expired"),
+            Pattern.compile("^/api/v1/payment/m/coupons/expire")
     );
 
     @Override
