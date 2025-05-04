@@ -36,7 +36,7 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
     // 인증이 필요 없는 경로 리스트
     private static final List<Pattern> EXCLUDED_PATHS = List.of(
             Pattern.compile("^/api/v1/config/.*"), // Config 서버 API 인증 제외
-            Pattern.compile("^/api/v1/member/(?!n/).*"), // 멤버 관련 API 인증 제외
+            Pattern.compile("^/api/v1/member/(?!m(?:/|$)).*"), // 멤버 관련 API 인증 제외
             Pattern.compile("^/api/v1/.*/actuators/.*$"), // Actuator API 인증 제외
             Pattern.compile("^/api/v1/.*/swagger-ui/.*$"), // 모든 서비스의 Swagger UI 인증 제외
             Pattern.compile("^/api/v1/.*/api-docs$"),
@@ -90,7 +90,6 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             try {
                 jwtTokenProvider.validateJwtToken(token);
                 Matcher matcher = PATH_PATTERN.matcher(requestPath);
-
                 if (matcher.matches()) {
                     String role = matcher.group(2);
 
