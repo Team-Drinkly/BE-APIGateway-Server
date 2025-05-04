@@ -14,37 +14,37 @@ spring:
     name: gateway
   config:
     import: optional:configserver:http://localhost:8888
-
-  cloud:
-    gateway:
-      routes:
-        - id: config-server # 헬스 체크용
-          uri: lb://CONFIG-SERVER
-          predicates:
-            - Path=/api/v1/config/**
-
-        - id: member-service # Routing to Member Micro Service
-          uri: lb://MEMBER-SERVICE
-          predicates:
-            - Path=/api/v1/member/**
-
-        - id: store-service  # Routing to Store Micro Service
-          uri: lb://STORE-SERVICE
-          predicates:
-            - Path=/api/v1/store/**
-          filters:
-            - AuthorizationHeaderFilter
-
-        - id: payment-service
-          uri: lb://PAYMENT-SERVICE
-          predicates:
-            - Path=/api/v1/payment/**
-          filters:
-            - AuthorizationHeaderFilter
-
-      discovery:
-        locator:
-          enabled: true
+#
+#  cloud:
+#    gateway:
+#      routes:
+#        - id: config-server # 헬스 체크용
+#          uri: lb://CONFIG-SERVER
+#          predicates:
+#            - Path=/api/v1/config/**
+#
+#        - id: member-service # Routing to Member Micro Service
+#          uri: lb://MEMBER-SERVICE
+#          predicates:
+#            - Path=/api/v1/member/**
+#
+#        - id: store-service  # Routing to Store Micro Service
+#          uri: lb://STORE-SERVICE
+#          predicates:
+#            - Path=/api/v1/store/**
+#          filters:
+#            - AuthorizationHeaderFilter
+#
+#        - id: payment-service
+#          uri: lb://PAYMENT-SERVICE
+#          predicates:
+#            - Path=/api/v1/payment/**
+#          filters:
+#            - AuthorizationHeaderFilter
+#
+#      discovery:
+#        locator:
+#          enabled: true
 
 management:
   endpoints:
