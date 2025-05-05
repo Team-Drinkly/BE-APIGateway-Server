@@ -78,12 +78,12 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
                 log.warn("Authorization 헤더 없음.");
-                return onError(exchange, ErrorCode.NOT_FOUND_JWT_TOKEN, HttpStatus.UNAUTHORIZED);
+                return onError(exchange, ErrorCode.NOT_FOUND_JWT_TOKEN, HttpStatus.valueOf(498));
             }
 
             String authorizationHeader = headers.getFirst(HttpHeaders.AUTHORIZATION);
             if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-                return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.UNAUTHORIZED);
+                return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.valueOf(498));
             }
 
             String token = authorizationHeader.substring(7).trim();
@@ -101,12 +101,12 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                         return validateMemberToken(exchange, chain, request, token);
                     }
                 }
-                return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.FORBIDDEN);
+                return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
 
             } catch (ExpiredJwtException e) {
-                return onError(exchange, ErrorCode.EXPIRED_JWT, HttpStatus.UNAUTHORIZED);
+                return onError(exchange, ErrorCode.EXPIRED_JWT, HttpStatus.valueOf(498));
             } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
-                return onError(exchange, ErrorCode.INVALID_JWT_TOKEN, HttpStatus.UNAUTHORIZED);
+                return onError(exchange, ErrorCode.INVALID_JWT_TOKEN, HttpStatus.valueOf(498));
             }
         };
     }
