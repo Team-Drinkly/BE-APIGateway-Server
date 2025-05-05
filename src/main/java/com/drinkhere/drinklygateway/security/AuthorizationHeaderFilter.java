@@ -13,7 +13,6 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -78,12 +77,12 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             HttpHeaders headers = request.getHeaders();
             if (!headers.containsKey(HttpHeaders.AUTHORIZATION)) {
                 log.warn("Authorization 헤더 없음.");
-                return onError(exchange, ErrorCode.NOT_FOUND_JWT_TOKEN, HttpStatus.valueOf(498));
+                return onError(exchange, ErrorCode.NOT_FOUND_JWT_TOKEN, 498);
             }
 
             String authorizationHeader = headers.getFirst(HttpHeaders.AUTHORIZATION);
             if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-                return onError(exchange, ErrorCode.INVALID_TOKEN, HttpStatus.valueOf(498));
+                return onError(exchange, ErrorCode.INVALID_TOKEN, 498);
             }
 
             String token = authorizationHeader.substring(7).trim();
@@ -101,12 +100,12 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                         return validateMemberToken(exchange, chain, request, token);
                     }
                 }
-                return onError(exchange, ErrorCode.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
+                return onError(exchange, ErrorCode.UNAUTHORIZED, 403);
 
             } catch (ExpiredJwtException e) {
-                return onError(exchange, ErrorCode.EXPIRED_JWT, HttpStatus.valueOf(498));
+                return onError(exchange, ErrorCode.EXPIRED_JWT, 498);
             } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
-                return onError(exchange, ErrorCode.INVALID_JWT_TOKEN, HttpStatus.valueOf(498));
+                return onError(exchange, ErrorCode.INVALID_JWT_TOKEN, 498);
             }
         };
     }
@@ -137,11 +136,11 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
         return chain.filter(exchange.mutate().request(newRequest).build());
     }
 
-    private Mono<Void> onError(ServerWebExchange exchange, ErrorCode errorCode, HttpStatus status) {
-        log.warn("Authorization error: {} - {}", status, errorCode);
+    private Mono<Void> onError(ServerWebExchange exchange, ErrorCode errorCode, int statusCode) {
+        log.warn("Authorization error: {} - {}", statusCode, errorCode);
 
         ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(status);
+        response.setRawStatusCode(statusCode);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         ErrorResponse<?> responseBody = new ErrorResponse<>(errorCode);
@@ -155,4 +154,5 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             return response.setComplete();
         }
     }
+
 }
