@@ -48,9 +48,13 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             Pattern.compile("^/api/v1/store/m/free-drink/checkUsedYn$"),
             Pattern.compile("^/api/v1/payment/m/coupons/expired"),
             Pattern.compile("^/api/v1/payment/m/coupons/expire"),
+            Pattern.compile("^/api/v1/payment/m/coupons/expire"),
             Pattern.compile("^/api/v1/payment/m/nicepay/internal/.*$"),
+            Pattern.compile("^/api/v1/payment/m/coupon-issue/invite$"),
+            Pattern.compile("^/api/v1/payment/m/coupon-issue/invite(\\?.*)?$"),
             Pattern.compile("^/api/v1/event/m$"),
-            Pattern.compile("^/api/v1/event/m/\\d+$")
+            Pattern.compile("^/api/v1/event/m/\\d+$"),
+            Pattern.compile("^/api/v1/event/m/external$")
     );
 
     // 경로 패턴 `/api/v1/{service}/{role}/**`
