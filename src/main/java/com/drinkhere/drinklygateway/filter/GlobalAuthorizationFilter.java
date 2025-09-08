@@ -43,11 +43,11 @@ public class GlobalAuthorizationFilter implements GlobalFilter {
             Pattern.compile("^/api/v1/payment/m/coupons/expired"),
             Pattern.compile("^/api/v1/payment/m/coupons/expire"),
             Pattern.compile("^/api/v1/payment/m/nicepay/internal/.*$"),
-            Pattern.compile("^/api/v1/payment/m/coupon-issue/invite$"),
-            Pattern.compile("^/api/v1/payment/m/coupon-issue/invite(\\?.*)?$"),
+            Pattern.compile("^/api/v1/payment/m/coupon-issue/invite(?:\\?.*)?$"), // 수정
             Pattern.compile("^/api/v1/event/m$"),
             Pattern.compile("^/api/v1/event/m/\\d+$"),
-            Pattern.compile("^/api/v1/event/m/external$")
+            Pattern.compile("^/api/v1/event/m/external$"),
+            Pattern.compile("^/api/v1/event/m/banner$")
     );
 
     @Override
